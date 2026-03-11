@@ -494,8 +494,13 @@ const calculateMultiTP = (signal, entry, atr, srLevels, pairName) => {
     const isGold = pairName && pairName.includes('XAU');
     const isCommodity = pairName && (pairName.includes('OIL') || pairName.includes('NGA') || pairName.includes('XAG'));
 
-    // Max SL distance: cap to prevent unrealistic levels
-    const maxSLDistance = atr * 2;
+    const isCommodityOrGold = isGold || isCommodity;
+
+    // Tighter SL for commodities (0.25 ATR instead of 0.5 ATR)
+    const slMultiplier = isCommodityOrGold ? 0.25 : 0.5;
+
+    // Max SL distance: cap to prevent unrealistic levels (tighter cap for commodities)
+    const maxSLDistance = isCommodityOrGold ? (atr * 1.0) : (atr * 1.5);
 
     let stopLoss, riskDistance;
 
@@ -505,9 +510,9 @@ const calculateMultiTP = (signal, entry, atr, srLevels, pairName) => {
             .filter(s => s.price < entry)
             .sort((a, b) => b.price - a.price)[0];
 
-        // SL = 1 ATR below nearest support (or 1.5 ATR below entry if no support found)
+        // SL = slMultiplier ATR below nearest support
         const structureLevel = nearestSupport ? nearestSupport.price : entry;
-        stopLoss = structureLevel - atr;
+        stopLoss = structureLevel - (atr * slMultiplier);
 
         // Cap the SL distance
         if (entry - stopLoss > maxSLDistance) {
@@ -535,9 +540,9 @@ const calculateMultiTP = (signal, entry, atr, srLevels, pairName) => {
             .filter(r => r.price > entry)
             .sort((a, b) => a.price - b.price)[0];
 
-        // SL = 1 ATR above nearest resistance
+        // SL = slMultiplier ATR above nearest resistance
         const structureLevel = nearestResistance ? nearestResistance.price : entry;
-        stopLoss = structureLevel + atr;
+        stopLoss = structureLevel + (atr * slMultiplier);
 
         // Cap the SL distance
         if (stopLoss - entry > maxSLDistance) {
@@ -939,7 +944,7 @@ export const priceToPips = (pairName, priceDistance) => {
 /**
  * Generate scalping signals with tighter parameters:
  * - ATR period: 7 (faster response)
- * - SL: 0.75 ATR (tight)
+ * - SL: 0.5 ATR (tighter)
  * - TP1: 1R (50%), TP2: 1.5R (30%), TP3: 2R (20%)
  * - Min R:R: 1:1
  * - 5 strategies: EMA Cross, RSI Reversal, Spread Bounce, Micro Breakout, Momentum Burst
@@ -1116,15 +1121,20 @@ export const generateScalpSignal = (candles, currentPrice, strategy, indicators 
     // ===== Calculate scalp-tight TP levels =====
     let multiTP = null;
     if (signal !== 'WAIT' && atr) {
-        const slDistance = atr * 0.75; // Tighter SL for scalping
+        const isGold = pairName && pairName.includes('XAU');
+        const isCommodity = pairName && (pairName.includes('OIL') || pairName.includes('NGA') || pairName.includes('XAG'));
+        const isCommodityOrGold = isGold || isCommodity;
+
+        const slDistance = isCommodityOrGold ? (atr * 0.25) : (atr * 0.5); // Tighter SL for scalping
+        const maxSLDistance = isCommodityOrGold ? (atr * 0.5) : (atr * 1.0);
 
         if (signal === 'BUY') {
             const nearestSup = srLevels.support
                 .filter(s => s.price < entry)
                 .sort((a, b) => b.price - a.price)[0];
 
-            const structureSL = nearestSup ? nearestSup.price - (atr * 0.3) : entry - slDistance;
-            const stopLoss = Math.max(structureSL, entry - atr * 1.5); // Cap max SL
+            const structureSL = nearestSup ? nearestSup.price - (atr * 0.15) : entry - slDistance;
+            const stopLoss = Math.max(structureSL, entry - maxSLDistance); // Cap max SL
 
             const risk = entry - stopLoss;
             if (risk <= 0) {
@@ -1157,8 +1167,8 @@ export const generateScalpSignal = (candles, currentPrice, strategy, indicators 
                 .filter(r => r.price > entry)
                 .sort((a, b) => a.price - b.price)[0];
 
-            const structureSL = nearestRes ? nearestRes.price + (atr * 0.3) : entry + slDistance;
-            const stopLoss = Math.min(structureSL, entry + atr * 1.5);
+            const structureSL = nearestRes ? nearestRes.price + (atr * 0.15) : entry + slDistance;
+            const stopLoss = Math.min(structureSL, entry + maxSLDistance);
 
             const risk = stopLoss - entry;
             if (risk <= 0) {
