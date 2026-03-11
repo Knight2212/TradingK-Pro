@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+        {
+            "source": "/tv-scan/:scanner/scan",
+            "destination": "/api/proxy?scanner=:scanner"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}

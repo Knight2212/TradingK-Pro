@@ -1,0 +1,7 @@
+node_modules
+dist
+release
+.DS_Store
+*.local
+.gemini
+TradingK_Full_Codebase.pdf
